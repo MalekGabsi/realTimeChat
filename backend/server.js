@@ -1,4 +1,5 @@
 import path from "path";
+import { fileURLToPath } from "url";
 import express from "express";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
@@ -9,27 +10,46 @@ import userRoutes from "./routes/user.routes.js";
 
 import connectToMongoDB from "./db/connectToMongoDB.js";
 import { app, server } from "./socket/socket.js";
-
+console.log("JWT Secret:", process.env.JWT_SECRET);
+// Load environment variables
 dotenv.config();
 
-const __dirname = path.resolve();
-// PORT should be assigned after calling dotenv.config() because we need to access the env variables. Didn't realize while recording the video. Sorry for the confusion.
+// Fix __dirname in ES modules
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Debugging: Check if MONGO_URI is loaded
+if (!process.env.MONGO_URI) {
+  console.error("❌ MONGO_URI is not defined. Check your .env file.");
+  process.exit(1);
+} else {
+  console.log("✅ Mongo URI Loaded:", process.env.MONGO_URI);
+}
+
 const PORT = process.env.PORT || 5000;
 
-app.use(express.json()); // to parse the incoming requests with JSON payloads (from req.body)
+// Middleware
+app.use(express.json()); // Parse JSON requests
 app.use(cookieParser());
 
+// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/users", userRoutes);
 
-app.use(express.static(path.join(__dirname, "/frontend/dist")));
+// Serve frontend
+app.use(express.static(path.join(__dirname, "../frontend/dist")));
 
 app.get("*", (req, res) => {
-	res.sendFile(path.join(__dirname, "frontend", "dist", "index.html"));
+  res.sendFile(path.join(__dirname, "../frontend/dist", "index.html"));
 });
 
-server.listen(PORT, () => {
-	connectToMongoDB();
-	console.log(`Server Running on port ${PORT}`);
+// Start server
+server.listen(PORT, async () => {
+  try {
+    await connectToMongoDB(); // Ensure MongoDB connection before running the server
+    console.log(`🚀 Server Running on port ${PORT}`);
+  } catch (error) {
+    console.error("❌ MongoDB connection failed:", error.message);
+    process.exit(1);
+  }
 });
